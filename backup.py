@@ -14,6 +14,7 @@ class RedisBackup:
     def __init__(self):
         self.redis_host = os.getenv('REDIS_HOST', 'localhost')
         self.redis_port = os.getenv('REDIS_PORT', '6379')
+        self.redis_password = os.getenv('REDIS_PASSWORD')
         self.s3_bucket = os.getenv('S3_BUCKET')
         self.s3_prefix = os.getenv('S3_PREFIX', 'redis-backups')
         self.cron_schedule = os.getenv('CRON_SCHEDULE', '0 * * * *')  # hourly
@@ -34,10 +35,14 @@ class RedisBackup:
         try:
             # Create Redis dump
             logger.info(f"Creating Redis backup from {self.redis_host}:{self.redis_port}")
-            subprocess.run([
-                'redis-cli', '-h', self.redis_host, '-p', self.redis_port,
-                '--rdb', dump_file
-            ], check=True)
+            
+            # Build redis-cli command with auth
+            cmd = ['redis-cli', '-h', self.redis_host, '-p', self.redis_port]
+            if self.redis_password:
+                cmd.extend(['-a', self.redis_password])
+            cmd.extend(['--rdb', dump_file])
+            
+            subprocess.run(cmd, check=True)
             
             # Upload to S3
             s3_key = f"{self.s3_prefix}/dump-{timestamp}.rdb"
